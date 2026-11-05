@@ -1,3 +1,5 @@
+# lang: YAML, file: rdp-a.yml, target: GitHub Actions / Windows runner
+
 name: XENON RDP
 
 on:
@@ -14,9 +16,9 @@ jobs:
       - name: Set RDP password
         shell: powershell
         run: |
-          net user runneradmin "${{ secrets.RDP_PASSWORD }}" /add 2>$null || $true
+          net user runneradmin "${{ secrets.RDP_PASSWORD }}" /add 2>&1 | Out-Null
           net user runneradmin "${{ secrets.RDP_PASSWORD }}"
-          net localgroup Administrators runneradmin /add 2>$null || $true
+          net localgroup Administrators runneradmin /add 2>&1 | Out-Null
 
       - name: Enable RDP
         shell: powershell
@@ -38,7 +40,7 @@ jobs:
         shell: powershell
         run: |
           $env:PATH += ";C:\Program Files\Tailscale"
-          tailscale up --authkey="${{ secrets.TALESCALE_AUTH_KEY }}" --hostname="rdp-slot-a"
+          tailscale up --authkey="${{ secrets.TAILSCALE_AUTH_KEY }}" --hostname="rdp-slot-a"
           Start-Sleep -Seconds 10
           tailscale ip -4
 
