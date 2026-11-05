@@ -16,9 +16,19 @@ jobs:
       - name: Set RDP password
         shell: powershell
         run: |
-          net user runneradmin "${{ secrets.RDP_PASSWORD }}" /add 2>&1 | Out-Null
-          net user runneradmin "${{ secrets.RDP_PASSWORD }}"
-          net localgroup Administrators runneradmin /add 2>&1 | Out-Null
+          $user = "runneradmin"
+          $password = "${{ secrets.RDP_PASSWORD }}"
+
+          if (-not (Get-LocalUser -Name $user -ErrorAction SilentlyContinue)) {
+            net user $user $password /add 2>&1 | Out-Null
+          } else {
+            net user $user $password 2>&1 | Out-Null
+          }
+
+          $admins = net localgroup Administrators
+          if ($admins -notmatch $user) {
+            net localgroup Administrators $user /add 2>&1 | Out-Null
+          }
 
       - name: Enable RDP
         shell: powershell
