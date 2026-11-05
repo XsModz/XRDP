@@ -38,7 +38,7 @@ jobs:
         shell: powershell
         run: |
           $env:PATH += ";C:\Program Files\Tailscale"
-          tailscale up --authkey="${{ secrets.TS_AUTHKEY }}" --hostname="rdp-slot-a"
+          tailscale up --authkey="${{ secrets.TALESCALE_AUTH_KEY }}" --hostname="rdp-slot-a"
           Start-Sleep -Seconds 10
           tailscale ip -4
 
