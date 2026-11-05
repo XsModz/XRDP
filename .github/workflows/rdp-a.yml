@@ -1,6 +1,6 @@
 # lang: YAML, file: rdp-a.yml, target: GitHub Actions / Windows runner
 
-name: XENON RDP
+name: RDP Slot A
 
 on:
   workflow_dispatch:
@@ -13,22 +13,26 @@ jobs:
     timeout-minutes: 350
 
     steps:
-      - name: Set RDP password
+      - name: Generate and set RDP password
         shell: powershell
         run: |
-          $user = "runneradmin"
-          $password = "${{ secrets.RDP_PASSWORD }}"
+          $suffix = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 12 | ForEach-Object { [char]$_ })
+          $pass = "XC$suffix"
+          Write-Output "Generated RDP password with prefix XC"
 
-          if (-not (Get-LocalUser -Name $user -ErrorAction SilentlyContinue)) {
-            net user $user $password /add 2>&1 | Out-Null
-          } else {
-            net user $user $password 2>&1 | Out-Null
+          $sec = ConvertTo-SecureString $pass -AsPlainText -Force
+          New-LocalUser -Name "rdpuser" -Password $sec -FullName "RDP User" -Description "RDP" -ErrorAction SilentlyContinue
+          Add-LocalGroupMember -Group "Administrators" -Member "rdpuser" -ErrorAction SilentlyContinue
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "rdpuser" -ErrorAction SilentlyContinue
+
+          # Also set on existing runneradmin just in case
+          $user = Get-LocalUser -Name "runneradmin" -ErrorAction SilentlyContinue
+          if ($user) {
+            $user | Set-LocalUser -Password $sec
           }
 
-          $admins = net localgroup Administrators
-          if ($admins -notmatch $user) {
-            net localgroup Administrators $user /add 2>&1 | Out-Null
-          }
+          # Save password to file so next step can read it
+          $pass | Out-File -FilePath "$env:TEMP\rdppass.txt" -Encoding utf8
 
       - name: Enable RDP
         shell: powershell
@@ -53,6 +57,17 @@ jobs:
           tailscale up --authkey="${{ secrets.TAILSCALE_AUTH_KEY }}" --hostname="rdp-slot-a"
           Start-Sleep -Seconds 10
           tailscale ip -4
+
+      - name: Print credentials
+        shell: powershell
+        run: |
+          $pass = Get-Content "$env:TEMP\rdppass.txt" -Raw
+          $ip = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          Write-Output "==============================="
+          Write-Output "  RDP USERNAME : rdpuser"
+          Write-Output "  RDP PASSWORD : $pass"
+          Write-Output "  TAILSCALE IP : $ip"
+          Write-Output "==============================="
 
       - name: Keep alive
         shell: powershell
