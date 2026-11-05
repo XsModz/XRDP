@@ -1,0 +1,49 @@
+name: XENON RDP
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Set RDP password
+        shell: powershell
+        run: |
+          net user runneradmin "${{ secrets.RDP_PASSWORD }}" /add 2>$null || $true
+          net user runneradmin "${{ secrets.RDP_PASSWORD }}"
+          net localgroup Administrators runneradmin /add 2>$null || $true
+
+      - name: Enable RDP
+        shell: powershell
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
+            -Name fDenyTSConnections -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+            -Name UserAuthentication -Value 1
+
+      - name: Install Tailscale
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" `
+            -OutFile "$env:TEMP\ts.exe"
+          Start-Process "$env:TEMP\ts.exe" -ArgumentList "/S" -Wait
+
+      - name: Connect Tailscale
+        shell: powershell
+        run: |
+          $env:PATH += ";C:\Program Files\Tailscale"
+          tailscale up --authkey="${{ secrets.TS_AUTHKEY }}" --hostname="rdp-slot-a"
+          Start-Sleep -Seconds 10
+          tailscale ip -4
+
+      - name: Keep alive
+        shell: powershell
+        run: |
+          $end = (Get-Date).AddMinutes(350)
+          while ((Get-Date) -lt $end) { Start-Sleep -Seconds 30 }
